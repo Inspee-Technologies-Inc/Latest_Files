@@ -42,6 +42,10 @@ class EventDetailViewController: UIViewController {
         
         feedlikeLabel.text = "\((feedInfo.liked)!)"
         dislikeLabel.text = "\((feedInfo.disliked)!)"
+        if (feedInfo.reported) {
+            reportbutton.tintColor = UIColor.red
+            reportbutton.isUserInteractionEnabled = false
+        }
         photoImageView.sd_setImage(with: URL.init(string: feedInfo.photoUrl)) { (image, error, cacheType, url) in
             if (error == nil) {
                 self.photoImageView.image = image
@@ -94,10 +98,15 @@ class EventDetailViewController: UIViewController {
     }
     
     @IBAction func onReportFeed(_ sender: UIButton) {
-        FeedManager.shared.report(feedInfo)
-        reportbutton.tintColor = UIColor.red
-        
-        SVProgressHUD.showError(withStatus: "This post has been reported and is being reviewed.")
+        let alert = UIAlertController.init(title: "Would you like to report this content?", message: "", preferredStyle: .alert)
+        alert.addAction(UIAlertAction.init(title: "Yes", style: .default, handler: { (action) in
+            FeedManager.shared.report(self.feedInfo)
+            self.reportbutton.tintColor = UIColor.red
+            
+            SVProgressHUD.showError(withStatus: "This post has been reported and is being reviewed.")
+        }))
+        alert.addAction(UIAlertAction.init(title: "No", style: .cancel, handler: nil))
+        self.present(alert, animated: true, completion: nil)
     }
     
     @objc func onExpTimer() {

@@ -9,6 +9,8 @@
 import UIKit
 import Firebase
 import SVProgressHUD
+import MobileCoreServices
+import AVFoundation
 
 class EventPostViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIPickerViewDelegate, UIPickerViewDataSource, UITextFieldDelegate {
 
@@ -23,7 +25,7 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     var expirationCell: EvtExpirationTableViewCell!
     var summaryCell: EvtSummaryTableViewCell!
     
-    var photoImage: UIImage?
+    var videoURL: URL!
     var expiration: TimeInterval = 23 * 3600 + 59 * 60
 
     var isLiveDealEvent: Bool!
@@ -33,13 +35,14 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        if (self.isLiveDealEvent == true) {
-            titleLabel.text = "LIVE DEALS AND EVENTS"
-            categories = ["Music", "Food & Drinks", "Arts & Craft", "Educational", "Sports & Fitness", "Holidays", "Other"]
-        } else {
-            titleLabel.text = "LIVE SAFETY ALERTS"
-            categories = ["Arrest", "Arson", "Assault", "Death", "Large Crowd", "Lost Item", "Public Ashaming", "Self-Inflicting", "Shooting", "Suspicious Acts", "Suspicious Sound", "Theft", "Vandalism"]
-        }
+        self.isLiveDealEvent = true
+//        if (self.isLiveDealEvent == true) {
+//            titleLabel.text = "LIVE DEALS AND EVENTS"
+            categories = ["Music", "Food & Drinks", "Arts & Craft", "Educational", "Sports & Fitness", "Holidays", "Other", "Arrest", "Arson", "Assault", "Death", "Large Crowd", "Lost Item", "Public Ashaming", "Self-Inflicting", "Shooting", "Suspicious Acts", "Suspicious Sound", "Theft", "Vandalism"]
+//        } else {
+//            titleLabel.text = "LIVE SAFETY ALERTS"
+//            categories = ["Arrest", "Arson", "Assault", "Death", "Large Crowd", "Lost Item", "Public Ashaming", "Self-Inflicting", "Shooting", "Suspicious Acts", "Suspicious Sound", "Theft", "Vandalism"]
+//        }
         
         categoryPickerView = UIPickerView.init()
         categoryPickerView.delegate = self
@@ -61,23 +64,27 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     }
     
     func onTakePhoto() {
-        let alertView = UIAlertController.init(title: "Please Choose Source for Photo.", message: nil, preferredStyle: .actionSheet)
-        
-        alertView.addAction(UIAlertAction.init(title: "Photo Library", style: .default, handler: { (action) in
-            let picker = UIImagePickerController.init()
-            picker.sourceType = .photoLibrary
-            picker.delegate = self
-            self.present(picker, animated: true, completion: nil)
-        }))
-        alertView.addAction(UIAlertAction.init(title: "Camera", style: .default, handler: { (action) in
+//        let alertView = UIAlertController.init(title: "Please Choose Source for Photo.", message: nil, preferredStyle: .actionSheet)
+//
+//        alertView.addAction(UIAlertAction.init(title: "Photo Library", style: .default, handler: { (action) in
+//            let picker = UIImagePickerController.init()
+//            picker.sourceType = .photoLibrary
+//            picker.mediaTypes = [kUTTypeMovie as String]
+//            picker.videoMaximumDuration = 40
+//            picker.delegate = self
+//            self.present(picker, animated: true, completion: nil)
+//        }))
+//        alertView.addAction(UIAlertAction.init(title: "Camera", style: .default, handler: { (action) in
             let picker = UIImagePickerController.init()
             picker.sourceType = .camera
+            picker.mediaTypes = [kUTTypeMovie as String]
+            picker.videoMaximumDuration = 40
             picker.delegate = self
             self.present(picker, animated: true, completion: nil)
-        }))
-        alertView.addAction(UIAlertAction.init(title: "Cancel", style: .cancel, handler: nil))
-        
-        self.present(alertView, animated: true, completion: nil)
+//        }))
+//        alertView.addAction(UIAlertAction.init(title: "Cancel", style: .cancel, handler: nil))
+//
+//        self.present(alertView, animated: true, completion: nil)
     }
     
     @objc func onChangedExpireTime() {
@@ -93,8 +100,8 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     }
     
     @IBAction func onPostEvent(_ sender: Any) {
-        if (photoImage == nil) {
-            SVProgressHUD.showError(withStatus: "Please select photo.")
+        if (videoURL == nil) {
+            SVProgressHUD.showError(withStatus: "Please select video.")
             return;
         } else if (!isLiveDealEvent && categoryInputField?.text == "") {
             SVProgressHUD.showError(withStatus: "Please select category.")
@@ -103,30 +110,28 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
             SVProgressHUD.showError(withStatus: "Please describe your live event.")
             return;
         }
-        
+
         let storage = Storage.storage()
         let storageRef = storage.reference()
         
-        let imageData:Data = UIImageJPEGRepresentation(photoImage!, 1)! as Data
+        let riversRef = storageRef.child("videos/\(Date.timeIntervalSinceReferenceDate).mov")
+        let meta = StorageMetadata.init()
+        meta.contentType = "video/mov"
         
-        // Create a reference to the file you want to upload
-        let riversRef = storageRef.child("photos/\(Date.timeIntervalSinceReferenceDate).jpg")
-        
-        // Upload the file to the path "images/rivers.jpg"
-        SVProgressHUD.show(withStatus: "Uploading photo...")
-        riversRef.putData(imageData, metadata: nil) { (metadata, error) in
+        SVProgressHUD.show(withStatus: "Uploading video...")
+        riversRef.putFile(from: videoURL, metadata: meta) { (metadata, error) in
             SVProgressHUD.dismiss()
             if (error != nil) {
-                SVProgressHUD.showError(withStatus: "Could not upload photo.")
+                SVProgressHUD.showError(withStatus: "Could not upload video.")
                 return
             }
             
-            let photoUrl = metadata?.downloadURL()?.absoluteString
+            let vUploadedUrl = metadata?.downloadURL()?.absoluteString
             let category = self.categoryInputField?.text
             let summary = self.summaryCell.summaryTextView.text
-            
+
             FeedManager.init().addEvent(summary,
-                                        photoUrl: photoUrl,
+                                        photoUrl: vUploadedUrl,
                                         category: category,
                                         expiration: self.expiration,
                                         location: self.curLocation,
@@ -161,10 +166,20 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     // MARK: ImagePickerDelegate
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
-        photoImage = info[UIImagePickerControllerOriginalImage] as? UIImage
-        photoImageView?.contentMode = .scaleAspectFill
-        photoImageView?.clipsToBounds = true
-        photoImageView?.image = photoImage
+        videoURL = info[UIImagePickerControllerMediaURL] as! URL
+        
+        let asset = AVURLAsset(url: videoURL)
+        let imgGenerator = AVAssetImageGenerator(asset: asset)
+        do {
+            let cgImage = try imgGenerator.copyCGImage(at: CMTimeMake(0, 1), actualTime: nil)
+            let uiImage = UIImage(cgImage: cgImage)
+            
+            photoImageView?.contentMode = .scaleAspectFill
+            photoImageView?.clipsToBounds = true
+            photoImageView?.image = uiImage
+        } catch let error {
+            print(error.localizedDescription)
+        }
         
         picker.dismiss(animated: true, completion: nil)
     }
@@ -189,6 +204,8 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     
     func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
         categoryInputField?.text = categories[row]
+        
+        isLiveDealEvent = row < 7
     }
     
     // MARK: UITableView DataSource & Delegate
@@ -198,7 +215,7 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 4
+        return 3
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -220,11 +237,11 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
             return cell
         } else if (indexPath.row == 2) {
             let cell = tableView.dequeueReusableCell(withIdentifier: "SummaryCell") as! EvtSummaryTableViewCell
-            if (isLiveDealEvent == true) {
-                cell.titleLabel.text = "DESCRIBE YOUR LIVE DEALS AND EVENTS"
-            } else {
-                cell.titleLabel.text = "DESCRIBE YOUR LIVE SAFETY ALERT"
-            }
+//            if (isLiveDealEvent == true) {
+//                cell.titleLabel.text = "DESCRIBE YOUR LIVE DEALS AND EVENTS"
+//            } else {
+//                cell.titleLabel.text = "DESCRIBE YOUR LIVE SAFETY ALERT"
+//            }
             summaryCell = cell
             return cell
         } else {
@@ -248,8 +265,6 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
         if (indexPath.row == 0) {
             return 202
         } else if (indexPath.row == 1 && !self.isLiveDealEvent) {
-            return 78
-        } else if ((indexPath.row == 1 && self.isLiveDealEvent) || (indexPath.row == 2 && !self.isLiveDealEvent)) {
             return 92
         } else {
             return 75
@@ -261,12 +276,8 @@ class EventPostViewController: UIViewController, UITableViewDelegate, UITableVie
         
         if (indexPath.row == 0) {
             self.onTakePhoto()
-        } else if (indexPath.row == 1 && !self.isLiveDealEvent) {
+        } else if (indexPath.row == 1) {
             categoryInputField?.becomeFirstResponder()
-        } else if ((indexPath.row == 1 && self.isLiveDealEvent) || (indexPath.row == 2 && !self.isLiveDealEvent)) {
-            
-        } else {
-            
         }
     }
 }

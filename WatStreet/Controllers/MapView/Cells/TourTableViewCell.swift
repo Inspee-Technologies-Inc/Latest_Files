@@ -15,7 +15,6 @@ class TourTableViewCell: UITableViewCell {
     @IBOutlet weak var contentLabel: UILabel!
     @IBOutlet weak var rejectButton: UIButton!
     @IBOutlet weak var acceptButton: UIButton!
-    @IBOutlet weak var detailButton: UIButton!
     @IBOutlet weak var rejectIcon: UILabel!
     @IBOutlet weak var seeButton: UIButton!
     @IBOutlet weak var buttonWidthConstraint: NSLayoutConstraint!
@@ -65,6 +64,16 @@ class TourTableViewCell: UITableViewCell {
                 buttonWidthConstraint.constant = 0
                 seeButtonWidthConstraint.constant = 0
                 rejectButtonWidthConstraint.constant = orgStatusWidth
+            } else if (tour.status == "cancelled") {
+                rejectIcon.text = "CANCELLED"
+                buttonWidthConstraint.constant = 0
+                seeButtonWidthConstraint.constant = 0
+                rejectButtonWidthConstraint.constant = orgStatusWidth
+            } else if (tour.status == "expired") {
+                rejectIcon.text = "EXPIRED"
+                buttonWidthConstraint.constant = 0
+                seeButtonWidthConstraint.constant = 0
+                rejectButtonWidthConstraint.constant = orgStatusWidth
             } else {
                 rejectIcon.text = "REJECTED"
                 buttonWidthConstraint.constant = 0
@@ -86,6 +95,13 @@ class TourTableViewCell: UITableViewCell {
                 buttonWidthConstraint.constant = 0
                 seeButtonWidthConstraint.constant = orgSeeWidth
                 rejectButtonWidthConstraint.constant = 0
+            } else if (tour.status == "expired") {
+                bodyText = "Your \(type) was expired. Try later."
+                rejectIcon.text = "EXPIRED"
+                
+                buttonWidthConstraint.constant = 0
+                seeButtonWidthConstraint.constant = 0
+                rejectButtonWidthConstraint.constant = orgStatusWidth
             } else {
                 bodyText = "Your \(type) was rejected. Try later."
                 rejectIcon.text = "REJECTED"
@@ -101,7 +117,6 @@ class TourTableViewCell: UITableViewCell {
         contentLabel.attributedText = attributeStr
         
         seeButton.tag = indexPath.row
-        detailButton.tag = indexPath.row
         acceptButton.tag = indexPath.row
         rejectButton.tag = indexPath.row
     }

@@ -123,6 +123,8 @@ class FeedManager: NSObject {
             
             let childRef = self.feedRef.childByAutoId()
             childRef.setValue(param)
+            
+            self.changeUserCred(1, userId: (Auth.auth().currentUser?.uid)!)
         }
     }
     
@@ -169,7 +171,12 @@ class FeedManager: NSObject {
     
     func report(_ feed: FeedInfo!) {
         feed.reported = true
-        feedRef.child(feed.feedType).child(feed.uid).setValue(feed.toJson())
+        feedRef.child(feed.uid).setValue(feed.toJson())
+    }
+    
+    func reportUser(_ user: UserInfo!) {
+        User.currentUser?.blockUser(user.userId)
+        userRef.child((User.currentUser?.userId)!).child("blockedUsers").setValue(User.currentUser?.blockedUsers)
     }
     
     func follow(_ feed: FeedInfo, like: Int!, callback: @escaping () -> ()) {
@@ -201,12 +208,13 @@ class FeedManager: NSObject {
     }
     
     func likeTour(_ tour: TourRequestInfo, like: Int!) {
-        self.userRef.child(tour.userId).observeSingleEvent(of: .value, with: { (user) in
+        let cred = like < 3 ? 0 : (like < 5 ? 1 : 2)
+        self.userRef.child(tour.authorId).observeSingleEvent(of: .value, with: { (user) in
             if !(user.value is NSNull) {
                 var info = user.value as! [String: Any]
-                info["liked"] = (info["liked"] == nil) ? like : (info["liked"] as! Int + like)
+                info["liked"] = (info["liked"] == nil) ? cred : (info["liked"] as! Int + cred)
                 
-                self.userRef.child(tour.userId).setValue(info)
+                self.userRef.child(tour.authorId).setValue(info)
             }
         })
         
@@ -296,7 +304,10 @@ class FeedManager: NSObject {
     }
     
     // MARK: Tour Request
-    func addTourRequest(feedInfo: FeedInfo!, reason: String!, callback: @escaping (Bool, String) -> ()) {
+    func addTourRequest(feedInfo: FeedInfo!,
+                        reason: String!,
+                        expiration: TimeInterval!,
+                        callback: @escaping (Bool, String) -> ()) {
         let info = [
             "type": feedInfo.feedType,
             "reason": reason,
@@ -309,6 +320,7 @@ class FeedManager: NSObject {
             "lng": feedInfo.lng,
             "geoHash": GFGeoHash.init(location: CLLocationCoordinate2DMake(feedInfo.lat, feedInfo.lng)).geoHashValue,
             "street": feedInfo.street,
+            "expiration": expiration,
             "created": Date().timeIntervalSince1970,
             "status": "pending"
             ] as [String : Any]
@@ -330,29 +342,40 @@ class FeedManager: NSObject {
         let toUserId = info["userId"] as! String
         let message = "\(info["userName"] as! String) has requested a \(feedInfo.feedType == "event" ? "live event or deal" : "safety alert") tour."
         ApiManager.sendPushNotification(toUserId: toUserId, message: message)
+        
+        // Deduct Cred
+        self.changeUserCred(-2, userId: Auth.auth().currentUser?.uid)
     }
     
-    func addTourUserRequest(userInfo: UserInfo!, reason: String!, callback: @escaping (Bool, String) -> ()) {
-        let info = [
+    func addTourUserRequest(users: [UserInfo]!,
+                            reason: String!,
+                            expiration: TimeInterval!,
+                            callback: @escaping (Bool, String) -> ()) {
+        var info = [
             "type": "tour",
             "reason": reason,
             "userId": (Auth.auth().currentUser?.uid)!,
             "userName": (Auth.auth().currentUser?.displayName)!,
             "feedId": "",
-            "authorId": userInfo.userId,
-            "authorName": userInfo.name,
-            "lat": userInfo.lat!,
-            "lng": userInfo.lng!,
-            "geoHash": GFGeoHash.init(location: CLLocationCoordinate2DMake(userInfo.lat!, userInfo.lng!)).geoHashValue,
-            "street": userInfo.address,
+            "authorId": users[0].userId,
+            "authorName": users[0].name,
+            "lat": users[0].lat!,
+            "lng": users[0].lng!,
+            "geoHash": GFGeoHash.init(location: CLLocationCoordinate2DMake(users[0].lat!, users[0].lng!)).geoHashValue,
+            "street": users[0].address,
+            "expiration": expiration,
             "created": Date().timeIntervalSince1970,
             "status": "pending"
             ] as [String : Any]
         
+        var userIds: [String] = []
+        for userInfo in users {
+            userIds.append(userInfo.userId)
+        }
+        info["userIds"] = userIds
+
         let childRef = tourRef.childByAutoId()
         let userId = (Auth.auth().currentUser?.uid)!
-        let authorId = userInfo.userId!
-        
         tourRef.child(userId).child(childRef.key).setValue(info, withCompletionBlock: { (error, ref) in
             if (error == nil) {
                 callback (true, "")
@@ -360,12 +383,26 @@ class FeedManager: NSObject {
                 callback (false, (error?.localizedDescription)!)
             }
         })
-        tourRef.child(authorId).child(childRef.key).setValue(info)
         
-        // Send Push
-        let toUserId = info["userId"] as! String
-        let message = "\(info["userName"] as! String) sent you a tour request."
-        ApiManager.sendPushNotification(toUserId: toUserId, message: message)
+        for userInfo in users {
+            info["authorId"] = userInfo.userId
+            info["authorName"] = userInfo.name
+            info["lat"] = userInfo.lat
+            info["lng"] = userInfo.lng
+            info["geoHash"] = GFGeoHash.init(location: CLLocationCoordinate2DMake(userInfo.lat!, userInfo.lng!)).geoHashValue
+            info["street"] = userInfo.address
+            let authorId = userInfo.userId!
+            
+            tourRef.child(authorId).child(childRef.key).setValue(info)
+            
+            // Send Push
+            let toUserId = info["userId"] as! String
+            let message = "\(info["userName"] as! String) sent you a tour request."
+            ApiManager.sendPushNotification(toUserId: toUserId, message: message)
+        }
+        
+        // Deduct Cred
+        self.changeUserCred(-2, userId: Auth.auth().currentUser?.uid)
     }
     
     func rejectTour(_ tour: TourRequestInfo) {
@@ -377,6 +414,15 @@ class FeedManager: NSObject {
         let toUserId = tour.userId
         let message = "Your tour request has been rejected. Try later."
         ApiManager.sendPushNotification(toUserId: toUserId, message: message)
+        
+        userRef.child(tour.userId).observeSingleEvent(of: .value, with: { (user) in
+            if !(user.value is NSNull) {
+                var info = user.value as! [String: Any]
+                info["liked"] = (info["liked"] == nil) ? 2 : (info["liked"] as! Double + 2)
+                
+                self.userRef.child(tour.userId).setValue(info)
+            }
+        })
     }
     
     func acceptTour(_ tour: TourRequestInfo, videoUrl: String) {
@@ -387,10 +433,22 @@ class FeedManager: NSObject {
         tourRef.child(tour.userId).child(tour.uid).child("videoUrl").setValue(videoUrl)
         tourRef.child(tour.authorId).child(tour.uid).child("videoUrl").setValue(videoUrl)
         
+        for userId in tour.userIds {
+            if (userId == tour.authorId) {
+                continue
+            }
+            
+            tourRef.child(userId).child(tour.uid).child("status").setValue("cancelled")
+        }
+        
         // Send Push
         let toUserId = tour.userId
         let message = "Your tour request has been accepted."
         ApiManager.sendPushNotification(toUserId: toUserId, message: message)
     }
     
+    func changeUserCred(_ cred: Int!, userId: String!) {
+        userRef.child(userId).child("liked").setValue((User.currentUser?.liked)! + cred)
+        User.currentUser?.liked  = (User.currentUser?.liked)! + cred
+    }
 }

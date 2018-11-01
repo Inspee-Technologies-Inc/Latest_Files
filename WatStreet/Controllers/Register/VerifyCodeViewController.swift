@@ -14,6 +14,7 @@ class VerifyCodeViewController: UIViewController, UITextFieldDelegate {
 
     @IBOutlet weak var codeTextField: BlackDotTextField!
     @IBOutlet weak var verifyCodeButton: UIButton!
+    @IBOutlet weak var descriptionLabel: UILabel!
     
     var isFromForgot: Bool!
     var userInfo: UserInfo?
@@ -50,6 +51,10 @@ class VerifyCodeViewController: UIViewController, UITextFieldDelegate {
         verifyCodeButton.layer.cornerRadius = 30
         verifyCodeButton.layer.borderWidth = 0.5
         verifyCodeButton.layer.borderColor = UIColor.init(white: 0.2, alpha: 0.2).cgColor
+        
+        if (!self.isFromForgot) {
+            descriptionLabel.text = "We  have sent you an email. Quickly verify your account by entering the verification code we sent."
+        }
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {

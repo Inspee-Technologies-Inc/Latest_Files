@@ -13,12 +13,17 @@ import FirebaseAuth
 class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
     @IBOutlet weak var countLabel: UILabel!
     @IBOutlet weak var playButton: UIButton!
+    @IBOutlet weak var fullModeButton: UIButton!
     
     @IBOutlet weak var userNameLabel: UILabel!
     @IBOutlet weak var stredCredLabel: UILabel!
     
     @IBOutlet weak var ratingView: UIView!
+    @IBOutlet weak var leftButton: UIButton!
+    @IBOutlet weak var rightButton: UIButton!
     
+    @IBOutlet weak var commentLabel: UILabel!
+    @IBOutlet weak var summaryLabel: UILabel!
     
     var mediaPlayer: VLCMediaPlayer!
     var tours: [TourRequestInfo]!
@@ -27,6 +32,8 @@ class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
     var currentTour: TourRequestInfo!
     var isFullMode = false
     var feedManager: FeedManager!
+    
+    var feedInfo: FeedInfo!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -49,6 +56,19 @@ class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
         
         stredCredLabel.isUserInteractionEnabled = true
         stredCredLabel.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(FeedsTableViewCell.onTapCred)))
+        
+        if (feedInfo != nil) {
+            userNameLabel.text = ""
+            stredCredLabel.text = "@ \((feedInfo.street)!)"
+            leftButton.isHidden = true
+            rightButton.isHidden = true
+            summaryLabel.text = feedInfo.text
+            fullModeButton.setImage(#imageLiteral(resourceName: "ico_close"), for: .normal)
+            self.onPlay(playButton)
+        } else {
+            commentLabel.isHidden = true
+            summaryLabel.isHidden = true
+        }
     }
     
     func setTours(_ tours: [TourRequestInfo]!) {
@@ -110,14 +130,21 @@ class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
     @IBAction func onPlay(_ sender: UIButton) {
         playButton.isHidden = true
 
-        if (currentIndex >= 0 && currentIndex < tours.count) {
-            currentTour = tours[currentIndex]
-            mediaPlayer.media = VLCMedia.init(url: URL(string: currentTour.videoUrl)!)
+        if (feedInfo != nil) {
+            mediaPlayer.media = VLCMedia.init(url: URL(string: feedInfo.photoUrl)!)
             preview.frame = self.view.bounds
             mediaPlayer.drawable = preview
             mediaPlayer.play()
-            
-            self.displayInfo()
+        } else {
+            if (currentIndex >= 0 && currentIndex < tours.count) {
+                currentTour = tours[currentIndex]
+                mediaPlayer.media = VLCMedia.init(url: URL(string: currentTour.videoUrl)!)
+                preview.frame = self.view.bounds
+                mediaPlayer.drawable = preview
+                mediaPlayer.play()
+                
+                self.displayInfo()
+            }
         }
     }
     
@@ -146,6 +173,11 @@ class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
     }
 
     @IBAction func onFullscreen(_ sender: Any) {
+        if (feedInfo != nil) {
+            mediaPlayer.stop()
+            self.navigationController?.popViewController(animated: true)
+            return
+        }
         if (!isFullMode) {
             isFullMode = true
             let containerView = (self.parent as! MainViewController).videoView
@@ -175,13 +207,15 @@ class StreamPlayerViewController: UIViewController, VLCMediaPlayerDelegate {
     func mediaPlayerStateChanged(_ aNotification: Notification!) {
         if (mediaPlayer.state == .ended) {
             playButton.isHidden = false
-            if (self.currentTour.userId == Auth.auth().currentUser?.uid && self.currentTour.liked == 0) {
-                ratingView.isHidden = false
-            } else {
-                let containerView = (self.parent as! MainViewController).videoView
-                containerView?.isHidden = true
-            }
             
+            if (feedInfo == nil) {
+                if (self.currentTour.userId == Auth.auth().currentUser?.uid && self.currentTour.liked == 0) {
+                    ratingView.isHidden = false
+                } else {
+                    let containerView = (self.parent as! MainViewController).videoView
+                    containerView?.isHidden = true
+                }
+            }
         }
     }
     

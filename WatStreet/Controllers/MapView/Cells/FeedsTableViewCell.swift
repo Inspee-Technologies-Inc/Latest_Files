@@ -17,6 +17,9 @@ class FeedsTableViewCell: UITableViewCell {
     @IBOutlet weak var messageLabel: UILabel!
     @IBOutlet weak var requestTourButton: UIButton!
     @IBOutlet weak var detailButton: UIButton!
+    @IBOutlet weak var reportButton: UIButton!
+    @IBOutlet weak var detailWidthConstraint: NSLayoutConstraint!
+    @IBOutlet weak var requestWidthConstraint: NSLayoutConstraint!
     
     var feedInfo: FeedInfo!
     var userInfo: UserInfo!

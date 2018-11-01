@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import FirebaseAuth
 
 class UserInfo: NSObject {
     var userId: String!
@@ -19,6 +20,7 @@ class UserInfo: NSObject {
     var lat: Double?
     var lng: Double?
     var isActive: Bool!
+    var blockedUsers: [String]!
     
     func setJson(_ value: [String: Any]!, key: String!) -> UserInfo {
         userId = key
@@ -30,7 +32,18 @@ class UserInfo: NSObject {
         lng = value["lng"] as? Double
         address = value["address"] == nil ? "" : value["address"] as! String
         isActive = value["isActive"] == nil ? false : value["isActive"] as! Bool
+        blockedUsers = value["blockedUsers"] == nil ? [] : value["blockedUsers"] as! [String]
 
         return self
+    }
+    
+    func blockUser(_ userId: String) {
+        if (blockedUsers.index(of: userId) == nil) {
+            blockedUsers.append(userId)
+        }
+    }
+    
+    func isBlocked() -> Bool {
+        return User.currentUser?.blockedUsers.index(of: userId) != nil
     }
 }

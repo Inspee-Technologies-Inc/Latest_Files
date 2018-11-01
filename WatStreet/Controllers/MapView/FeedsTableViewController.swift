@@ -26,6 +26,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     
     var feedType = "feed"
     var isTourMine = false
+    var filterOption = 2
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -66,9 +67,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                     self.showNoFeedLabel()
-                    if (self.tours.count > 0) {
-                        self.tableView.scrollToRow(at: IndexPath(row: (self.tours.count - 1), section: 0), at: .bottom, animated: true)
-                    }
+                    self.scrollToLast()
                 }
             } else {
                 (self.parent as! MainViewController).refreshBadgeLabel(self.tours_all)
@@ -77,7 +76,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
         
         feedManager.setupTourEvents({ (tour) in
             print(" -------- Tour Added ---------")
-            if (((self.parent as! MainViewController).curLocation?.distance(from: CLLocation.init(latitude: tour.lat, longitude: tour.lng)))! > 1000) {
+            if ((self.parent as! MainViewController).curLocation != nil && ((self.parent as! MainViewController).curLocation?.distance(from: CLLocation.init(latitude: tour.lat, longitude: tour.lng)))! > 1000) {
                 return
             }
             
@@ -100,9 +99,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
             
             if (self.feedType == "tour") {
                 self.tableView.reloadData()
-                if (self.tours.count > 0) {
-                    self.tableView.scrollToRow(at: IndexPath(row: (self.tours.count - 1), section: 0), at: .bottom, animated: true)
-                }
+                self.scrollToLast()
                 self.showNoFeedLabel()
             } else {
                 (self.parent as! MainViewController).refreshBadgeLabel(self.tours_all)
@@ -125,6 +122,19 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
         }
     }
     
+    func scrollToLast() {
+        let rows = self.tableView(self.tableView, numberOfRowsInSection: 0)
+        if (rows > 0) {
+            self.tableView.scrollToRow(at: IndexPath(row: (rows - 1), section: 0), at: .bottom, animated: true)
+        }
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if (segue.destination is StreamPlayerViewController) {
+            (segue.destination as! StreamPlayerViewController).feedInfo = sender as! FeedInfo
+        }
+    }
+    
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
@@ -138,6 +148,10 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
                 return
             }
             
+            if (feed.reported == true) {
+                return
+            }
+            
             for item in self.feeds {
                 if (item.uid == feed.uid) {
                     return
@@ -146,9 +160,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
             
             self.feeds.append(feed)
             self.tableView.reloadData()
-            if (self.feeds.count > 0) {
-                self.tableView.scrollToRow(at: IndexPath(row: (self.feeds.count - 1), section: 0), at: .bottom, animated: true)
-            }
+            self.scrollToLast()
             self.showNoFeedLabel()
         }) { (feed) in
             print(" -------- Changed ---------")
@@ -176,10 +188,20 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     
     func showNoFeedLabel() {
         let noFeedLabel = (self.parent as! MainViewController).nofeedLabel
+        let noFeedObjLabel = (self.parent as! MainViewController).nofeedObjLabel
         let noFeedView = (self.parent as! MainViewController).nofeedView
         if (feedType == "feed") {
-            noFeedLabel?.text = "Street Feed Or\n Available users"
-            noFeedView?.isHidden = (feeds.count + users.count > 0)
+            noFeedLabel?.text = filterOption == 2 ? "Available Guides" : "Live Tours"
+            
+            if (filterOption == 0) {
+                noFeedView?.isHidden = (feeds.count + users.count > 0)
+            } else if (filterOption == 1) {
+                noFeedView?.isHidden = (feeds.count > 0)
+            } else {
+                noFeedView?.isHidden = (users.count > 0)
+            }
+            
+            noFeedObjLabel?.text = "There is no"
         } else {
             noFeedLabel?.text = "Tours"
             noFeedView?.isHidden = (tours.count > 0)
@@ -194,7 +216,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
         // Dispose of any resources that can be recreated.
     }
     
-    func updateLocation(_ feedType: String!, location: CLLocationCoordinate2D) {
+    func updateLocation(_ feedType: String!, location: CLLocationCoordinate2D?) {
         
         self.feedType = feedType
         if (feedType == "feed") {
@@ -210,12 +232,11 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
         self.showNoFeedLabel()
 
         if (feedType == "feed") {
-            feedManager.fetchFeed(location) { (feeds) in
+            feedManager.fetchFeed(location!) { (feeds) in
                 print(" -------- Fetched ---------")
                 self.feeds.removeAll()
-                let now = Date().timeIntervalSince1970
                 for item in feeds {
-                    if (item.created < now) {
+                    if (item.reported == true) {
                         continue
                     }
                     self.feeds.append(item)
@@ -225,16 +246,14 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                     self.showNoFeedLabel()
-                    if (self.feeds.count > 0) {
-                        self.tableView.scrollToRow(at: IndexPath(row: (self.feeds.count - 1), section: 0), at: .bottom, animated: true)
-                    }
+                    self.scrollToLast()
                 }
             }
             
-            feedManager.fetchUsers(location, callback: { (users) in
+            feedManager.fetchUsers(location!, callback: { (users) in
                 self.users.removeAll()
                 for user in users {
-                    if (user.userId != Auth.auth().currentUser?.uid && user.isActive) {
+                    if (user.userId != Auth.auth().currentUser?.uid && user.isActive && !user.isBlocked()) {
                         self.users.append(user)
                     }
                 }
@@ -264,9 +283,7 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
             DispatchQueue.main.async {
                 self.tableView.reloadData()
                 self.showNoFeedLabel()
-                if (self.tours.count > 0) {
-                    self.tableView.scrollToRow(at: IndexPath(row: (self.tours.count - 1), section: 0), at: .bottom, animated: true)
-                }
+                self.scrollToLast()
             }
         }
         
@@ -285,23 +302,17 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     // MARK: UI Events
     
     @IBAction func onViewDetail(_ sender: UIButton) {
-        if (self.feedType == "tour") {
-            let tourView = self.storyboard?.instantiateViewController(withIdentifier: "TourDetailView") as! TourDetailViewController
-            tourView.tourInfo = tours[sender.tag]
-            tourView.view.frame = CGRect(x: 0, y: 0, width: (UIScreen.main.bounds.size.width - 60), height: 310)
-            
-            (self.parent as! MainViewController).presentPopoverView(tourView)
-        } else {
-            let eventView = self.storyboard?.instantiateViewController(withIdentifier: "EventDetailView") as! EventDetailViewController
-            eventView.feedInfo = feeds[sender.tag]
-            eventView.view.frame = CGRect(x: 0, y: 0, width: (UIScreen.main.bounds.size.width - 20), height: 260)
-
-            (self.parent as! MainViewController).presentPopoverView(eventView)
-        }
+        self.performSegue(withIdentifier: "StreamView", sender: feeds[sender.tag])
     }
     
     @IBAction func onAccceptTour(_ sender: UIButton) {
-        onTakeVideo(sender.tag)
+        let tourView = self.storyboard?.instantiateViewController(withIdentifier: "TourDetailView") as! TourDetailViewController
+        tourView.tourInfo = tours[sender.tag]
+        tourView.view.frame = CGRect(x: 0, y: 0, width: (UIScreen.main.bounds.size.width - 60), height: 350)
+        tourView.myTag = sender.tag
+        tourView.superCtrler = self
+        
+        (self.parent as! MainViewController).presentPopoverView(tourView)
     }
     
     @IBAction func onRejectTour(_ sender: UIButton) {
@@ -318,7 +329,12 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     }
     
     @IBAction func onRequestTour(_ sender: UIButton) {
-        if (sender.tag < feeds.count) {
+        if ((User.currentUser?.liked)! < 2) {
+            SVProgressHUD.showError(withStatus: "You have to have a street cred to request a tour.")
+            return
+        }
+        
+        if ((filterOption == 0 && sender.tag < feeds.count) || filterOption == 1) {
             let feed = feeds[sender.tag]
             if (feed.userId == Auth.auth().currentUser?.uid) {
                 SVProgressHUD.showError(withStatus: "You cannot ask a tour request to yourself.")
@@ -327,26 +343,60 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
             
             (self.parent as! MainViewController).performSegue(withIdentifier: "RequestView", sender: feed)
         } else {
-            let user = users[sender.tag - feeds.count]
+            let user = users[sender.tag - (filterOption == 0 ? feeds.count : 0)]
             (self.parent as! MainViewController).performSegue(withIdentifier: "RequestView", sender: user)
+        }
+    }
+    
+    @IBAction func onReportFeed(_ sender: UIButton) {
+        if ((filterOption == 0 && sender.tag < feeds.count) || filterOption == 1) {
+            let feed = feeds[sender.tag]
+            if (feed.userId == Auth.auth().currentUser?.uid) {
+                SVProgressHUD.showError(withStatus: "You cannot report your feed.")
+                return
+            }
+
+            let alert = UIAlertController.init(title: "Would you like to report this content?", message: "", preferredStyle: .alert)
+            alert.addAction(UIAlertAction.init(title: "Yes", style: .default, handler: { (action) in
+                FeedManager.shared.report(feed)
+                self.feeds.remove(at: sender.tag)
+                self.tableView.reloadData()
+                
+                SVProgressHUD.showError(withStatus: "This post has been reported and is being reviewed.")
+            }))
+            alert.addAction(UIAlertAction.init(title: "No", style: .cancel, handler: nil))
+            self.present(alert, animated: true, completion: nil)
+        } else {
+            let user = users[sender.tag - (filterOption == 0 ? feeds.count : 0)]
+            
+            let alert = UIAlertController.init(title: "Would you like to block this user?", message: "", preferredStyle: .alert)
+            alert.addAction(UIAlertAction.init(title: "Yes", style: .default, handler: { (action) in
+                FeedManager.shared.reportUser(user)
+                self.users.remove(at: (self.filterOption == 0 ? sender.tag - self.feeds.count : sender.tag))
+                self.tableView.reloadData()
+                
+                SVProgressHUD.showError(withStatus: "This user has been blocked.")
+            }))
+            alert.addAction(UIAlertAction.init(title: "No", style: .cancel, handler: nil))
+            self.present(alert, animated: true, completion: nil)
         }
     }
     
     // MARK: Take Video Part
     
     func onTakeVideo(_ tourIndex: Int) {
-        let alertView = UIAlertController.init(title: "Please Choose Source for Photo.", message: nil, preferredStyle: .actionSheet)
-        
-        alertView.addAction(UIAlertAction.init(title: "Photo Library", style: .default, handler: { (action) in
-            let picker = UIImagePickerController.init()
-            picker.sourceType = .photoLibrary
-            picker.mediaTypes = [kUTTypeMovie as String]
-            picker.videoMaximumDuration = 40
-            picker.delegate = self
-            picker.view.tag = tourIndex
-            self.present(picker, animated: true, completion: nil)
-        }))
-        alertView.addAction(UIAlertAction.init(title: "Camera", style: .default, handler: { (action) in
+//        let alertView = UIAlertController.init(title: "Please Choose Source for Photo.", message: nil, preferredStyle: .actionSheet)
+//
+//        alertView.addAction(UIAlertAction.init(title: "Photo Library", style: .default, handler: { (action) in
+//            let picker = UIImagePickerController.init()
+//            picker.sourceType = .photoLibrary
+//            picker.mediaTypes = [kUTTypeMovie as String]
+//            picker.videoMaximumDuration = 40
+//            picker.delegate = self
+//            picker.view.tag = tourIndex
+//            self.present(picker, animated: true, completion: nil)
+//        }))
+//        alertView.addAction(UIAlertAction.init(title: "Camera", style: .default, handler: { (action) in
             let picker = UIImagePickerController.init()
             picker.sourceType = .camera
             picker.mediaTypes = [kUTTypeMovie as String]
@@ -354,10 +404,10 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
             picker.videoMaximumDuration = 40
             picker.view.tag = tourIndex
             self.present(picker, animated: true, completion: nil)
-        }))
-        alertView.addAction(UIAlertAction.init(title: "Cancel", style: .cancel, handler: nil))
-        
-        self.present(alertView, animated: true, completion: nil)
+//        }))
+//        alertView.addAction(UIAlertAction.init(title: "Cancel", style: .cancel, handler: nil))
+//
+//        self.present(alertView, animated: true, completion: nil)
     }
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
@@ -399,7 +449,17 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return self.feedType == "feed" ? (feeds.count + users.count) : tours.count
+        if (self.feedType == "feed") {
+            if (filterOption == 0) {
+                return feeds.count + users.count
+            } else if (filterOption == 1) {
+                return feeds.count
+            } else {
+                return users.count
+            }
+        } else {
+            return tours.count
+        }
     }
     
     override func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
@@ -413,7 +473,9 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         if (self.feedType == "feed") {
             let cell = tableView.dequeueReusableCell(withIdentifier: "FeedCell") as! FeedsTableViewCell
-            if (indexPath.row < feeds.count) {
+            cell.reportButton.tag = indexPath.row
+            
+            if ( (filterOption == 0 || filterOption == 1) && indexPath.row < feeds.count) {
                 let feed = feeds[indexPath.row]
                 cell.feedInfo = feed
                 cell.userInfo = nil
@@ -426,8 +488,10 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
                 cell.detailButton.isHidden = false
                 cell.detailButton.tag = indexPath.row
                 cell.requestTourButton.tag = indexPath.row
+                cell.detailWidthConstraint.constant = 30
+                cell.requestWidthConstraint.constant = 0
             } else {
-                let user = users[indexPath.row - feeds.count]
+                let user = filterOption == 1 ? users[indexPath.row - feeds.count] : users[indexPath.row]
                 cell.userInfo = user
                 cell.feedInfo = nil
 
@@ -438,6 +502,8 @@ class FeedsTableViewController: UITableViewController, UIImagePickerControllerDe
                 cell.detailButton.isHidden = true
                 cell.requestTourButton.tag = indexPath.row
                 cell.feedsTypeImageView.image = #imageLiteral(resourceName: "adsfeeds_icon")
+                cell.detailWidthConstraint.constant = 0
+                cell.requestWidthConstraint.constant = 30
             }
             
             return cell

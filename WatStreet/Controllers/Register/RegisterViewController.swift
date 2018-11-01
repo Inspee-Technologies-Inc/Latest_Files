@@ -17,7 +17,6 @@ import SkyFloatingLabelTextField
 class RegisterViewController: UIViewController, UITextFieldDelegate {
 
     @IBOutlet weak var nameTextField: BlackDotTextField!
-    @IBOutlet weak var birthdayTextField: BlackDotTextField!
     @IBOutlet weak var emailTextField: BlackDotImageTextField!
     @IBOutlet weak var passwordTextField: BlackDotImageTextField!
     @IBOutlet weak var contentScrollView: UIScrollView!
@@ -25,7 +24,6 @@ class RegisterViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var termsButton: UIButton!
     
     var termsAgreed: Bool!
-    var datePicker: UIDatePicker!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -54,7 +52,7 @@ class RegisterViewController: UIViewController, UITextFieldDelegate {
     // MARK: Initialization
     
     func initUI() {
-        let textFields = [nameTextField, birthdayTextField, emailTextField, passwordTextField] as [SkyFloatingLabelTextField]
+        let textFields = [nameTextField, emailTextField, passwordTextField] as [SkyFloatingLabelTextField]
 
         for field in textFields {
             field.backgroundColor = UIColor.clear
@@ -79,25 +77,13 @@ class RegisterViewController: UIViewController, UITextFieldDelegate {
         nameTextField.addBlackDot()
         emailTextField.addBlackDot()
         passwordTextField.addBlackDot()
-        birthdayTextField.addBlackDot()
         
         createAccountButton.clipsToBounds = true
         createAccountButton.layer.cornerRadius = 30
         createAccountButton.layer.borderWidth = 0.5
         createAccountButton.layer.borderColor = UIColor.init(white: 0.2, alpha: 0.2).cgColor
-        
-        datePicker = UIDatePicker.init()
-        datePicker.datePickerMode = .date
-        datePicker.addTarget(self, action: #selector(RegisterViewController.onDateChanged), for: .valueChanged)
-        birthdayTextField.inputView = datePicker
     }
     
-    // MARK: UITextField Delegate
-    
-    @objc func onDateChanged() {
-        birthdayTextField.text = DateUtils.shortDateFormatter.string(from: datePicker.date)
-    }
-
     // MARK: UI Events
     
     @IBAction func onCancel(_ sender: Any) {
@@ -118,16 +104,6 @@ class RegisterViewController: UIViewController, UITextFieldDelegate {
             return
         } else if (!InputValidator.isValidEmail(emailTextField.text!)) {
             SVProgressHUD.showError(withStatus: "Please enter valid email address.")
-            return
-        } else if (birthdayTextField.text == "") {
-            SVProgressHUD.showError(withStatus: "Please enter your birthday.")
-            return
-        }
-        
-        let ageComponents = Calendar.current.dateComponents([.year], from: datePicker.date, to: Date())
-        let age = ageComponents.year!
-        if (age < 16) {
-            SVProgressHUD.showError(withStatus: "You should be older than 16 years.")
             return
         }
         

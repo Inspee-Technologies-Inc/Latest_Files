@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1</string>
+	<string>1.1.2</string>
 	<key>CFBundleVersion</key>
-	<string>32</string>
+	<string>43</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -28,9 +28,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Camera to Take Photo and Video</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Would you like WatStreet to access your location?</string>
+	<string>This app uses your location in order help connect you with other users nearby who can provide you with a quick tour or need to request a quick tour from you.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Would you like WatStreet to access your location?</string>
+	<string>This app uses your location in order help connect you with other users nearby who can provide you with a quick tour or need to request a quick tour from you.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>For Live Streaming</string>
 	<key>NSPhotoLibraryUsageDescription</key>

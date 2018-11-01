@@ -16,5 +16,7 @@ target 'WatStreet' do
   pod 'Alamofire'
   pod 'SDWebImage'
   pod 'MobileVLCKit-unstable', '3.0.0a51'
-  pod 'HaishinKit', '~> 0.8.0' 
+  pod 'HaishinKit', '~> 0.8.0'
+  pod 'Fabric', '~> 1.7.6'
+  pod 'Crashlytics', '~> 3.10.1'
 end

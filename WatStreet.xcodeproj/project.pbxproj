@@ -386,6 +386,7 @@
 				8BD362AE1FCEB8DB004D2997 /* Resources */,
 				3E844124DD1B297D155A911A /* [CP] Embed Pods Frameworks */,
 				82F986929F238AED186FD3E2 /* [CP] Copy Pods Resources */,
+				F84452CD20B641FF00D05289 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -535,6 +536,19 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/Pods/Target Support Files/Pods-WatStreet/Pods-WatStreet-resources.sh\"\n";
 			showEnvVarsInLog = 0;
+		};
+		F84452CD20B641FF00D05289 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Fabric/run\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 

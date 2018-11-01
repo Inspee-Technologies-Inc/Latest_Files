@@ -29,11 +29,13 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
     @IBOutlet weak var streetNameField: UITextField!
     
     @IBOutlet var tabButtons: [UIButton]!
+    @IBOutlet var tabButtonLabels: [UILabel]!
     @IBOutlet weak var postExtraButton: UIButton!
 
     @IBOutlet weak var feedContainerView: UIView!
 
     @IBOutlet weak var nofeedLabel: UILabel!
+    @IBOutlet weak var nofeedObjLabel: UILabel!
     @IBOutlet weak var nofeedView: UIView!
     
     @IBOutlet weak var tourTabView: UIView!
@@ -96,12 +98,16 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
             (segue.destination as! FirstViewController).curLocation = self.curPrecisLocation
         } else if (segue.destination is LiveStreamViewController) {
             (segue.destination as! LiveStreamViewController).streamKey = (sender as! String)
+        } else if (segue.destination is EventPostViewController) {
+            (segue.destination as! EventPostViewController).curLocation = self.curPrecisLocation
         } else if (segue.destination is RequestTourViewController) {
             if (sender is FeedInfo) {
                 (segue.destination as! RequestTourViewController).feedInfo = (sender as! FeedInfo)
             } else {
                 (segue.destination as! RequestTourViewController).userInfo = (sender as! UserInfo)
             }
+            
+            (segue.destination as! RequestTourViewController).users = feedTableView.users
         }
     }
     
@@ -159,6 +165,7 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
             .observe(.childChanged) { (snapshot) in
             if (snapshot.value is Int && snapshot.key == "liked") {
                 self.stredCredLabel.text = "Street Cred - \(InputValidator.getCount(snapshot.value as! Int))"
+                User.currentUser?.liked = snapshot.value as! Int
             }
         }
     }
@@ -339,23 +346,39 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
         self.view.endEditing(true)
 
         for button in tabButtons {
-            button.tintColor = UIColor.lightGray
+            button.tintColor = UIColor.gray
         }
+        
+        for label in tabButtonLabels {
+            label.textColor = UIColor.gray
+        }
+        
         sender.tintColor = UIColor.blue
         
         // Process based on the selected tab bar item
         if (sender == tabButtons[0]) {
-            postExtraButton.isHidden = false
             feedType = "feed"
+            feedTableView.filterOption = 1
+            tabButtonLabels[0].textColor = UIColor.blue
         } else if (sender == tabButtons[1]) {
-            postExtraButton.isHidden = true
             feedType = "tour"
+            tabButtonLabels[1].textColor = UIColor.blue
+            
+            if (feedTableView.isTourMine) {
+                nofeedObjLabel.text = "You haven't given any"
+            } else {
+                nofeedObjLabel.text = "You haven't requested any"
+            }
+        } else if (sender == tabButtons[2]) {
+            feedType = "feed"
+            feedTableView.filterOption = 2
+            tabButtonLabels[2].textColor = UIColor.blue
         }
         
         refreshPostButtonStatus()
 
-        if (curLocation != nil) {
-            feedTableView.updateLocation(feedType, location: (curLocation?.coordinate)!)
+        if (feedType == "tour" || curLocation != nil) {
+            feedTableView.updateLocation(feedType, location: curLocation?.coordinate)
         }
     }
     
@@ -364,19 +387,19 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
             requestsTabButton.backgroundColor = UIColor.lightGray
             myToursTabButton.backgroundColor = postExtraButton.backgroundColor
             videoView.isHidden = true
+            nofeedObjLabel.text = "You haven't requested any"
             
             feedTableView.isTourMine = false
         } else {
             requestsTabButton.backgroundColor = postExtraButton.backgroundColor
             myToursTabButton.backgroundColor = UIColor.lightGray
             videoView.isHidden = true
-            
+            nofeedObjLabel.text = "You haven't given any"
+
             feedTableView.isTourMine = true
         }
         
-        if (curLocation != nil) {
-            feedTableView.updateLocation(feedType, location: (curLocation?.coordinate)!)
-        }
+        feedTableView.updateLocation(feedType, location: curLocation?.coordinate)
     }
     
     
@@ -392,6 +415,11 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
         if (feedType == "feed") {
             tourTabView.isHidden = true
             videoView.isHidden = true
+            
+            if (feedTableView.filterOption == 2) {
+                postButtonHeightConstraint.constant = 0
+                postExtraButton.isHidden = true
+            }
         } else {
             tourTabView.isHidden = false
             postButtonHeightConstraint.constant = 55
@@ -443,14 +471,18 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return placesArray.count
+        return placesArray.count + 1
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell")
         
-        let place = placesArray[indexPath.row]
-        cell?.textLabel?.attributedText = place.attributedFullText
+        if (indexPath.row == 0) {
+            cell?.textLabel?.text = "Exit Search"
+        } else {
+            let place = placesArray[indexPath.row - 1]
+            cell?.textLabel?.attributedText = place.attributedFullText
+        }
         
         return cell!
     }
@@ -458,7 +490,13 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
-        let place = placesArray[indexPath.row]
+        if (indexPath.row == 0) {
+            streetNameField.resignFirstResponder()
+            tableView.isHidden = true
+            return
+        }
+        
+        let place = placesArray[indexPath.row - 1]
         streetNameField.text = place.attributedFullText.string
         placesTableView.isHidden = true
         
@@ -466,6 +504,9 @@ class MainViewController: UIViewController, CLLocationManagerDelegate, MKMapView
             if (error == nil) {
                 self.lat = place?.coordinate.latitude
                 self.lng = place?.coordinate.longitude
+                self.streetNameField.resignFirstResponder()
+                
+                self.updateLocation(location: CLLocation.init(latitude: self.lat!, longitude: self.lng!))
             }
         }
         

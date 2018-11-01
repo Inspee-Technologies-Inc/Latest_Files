@@ -24,6 +24,8 @@ class TourRequestInfo: NSObject {
     var videoUrl: String!
     var created: Double!
     var liked: Int!
+    var expiration: TimeInterval!
+    var userIds: [String]!
 
     func setJson(_ value: [String: Any]!, key: String!) -> TourRequestInfo {
         uid = key
@@ -42,7 +44,14 @@ class TourRequestInfo: NSObject {
         created = value["created"] as! Double
         videoUrl = value["videoUrl"] == nil ? "" : value["videoUrl"] as! String
         liked = value["liked"] == nil ? 0 : value["liked"] as! Int
-
+        expiration = value["expiration"] == nil ? 0 : value["expiration"] as! TimeInterval
+        userIds = value["userIds"] == nil ? [] : value["userIds"] as! [String]
+        
+        let fornow = Date().timeIntervalSince1970
+        if (status == "pending" && created + expiration < fornow) {
+            status = "expired"
+        }
+        
         return self
     }
     

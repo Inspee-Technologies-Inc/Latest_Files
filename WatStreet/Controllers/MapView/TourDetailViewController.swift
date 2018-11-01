@@ -18,6 +18,8 @@ class TourDetailViewController: UIViewController {
     @IBOutlet weak var reasonTextView: UITextView!
     
     var tourInfo: TourRequestInfo!
+    var myTag: Int!
+    var superCtrler: FeedsTableViewController!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -53,4 +55,11 @@ class TourDetailViewController: UIViewController {
     @IBAction func onClose(_ sender: Any) {
         (self.parent as! MainViewController).onTapTransparentView()
     }
+    
+    @IBAction func onRecordTour(_ sender: Any) {
+        (self.parent as! MainViewController).onTapTransparentView()
+        superCtrler.onTakeVideo(myTag)
+    }
+    
+    
 }
